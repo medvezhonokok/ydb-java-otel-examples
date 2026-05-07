@@ -1,0 +1,182 @@
+{
+  "title": "YDB Java SDK — OpenTelemetry",
+  "uid": "ydb-java-sdk",
+  "schemaVersion": 38,
+  "timezone": "browser",
+  "refresh": "5s",
+  "time": { "from": "now-15m", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Request Rate (RPS)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "fieldConfig": {
+        "defaults": { "unit": "reqps", "color": { "mode": "palette-classic" } }
+      },
+      "options": { "legend": { "displayMode": "table", "placement": "right" } },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "Prometheus" },
+          "expr": "sum by (ydb_operation_name) (rate(db_client_operation_duration_seconds_count[$__rate_interval]))",
+          "legendFormat": "{{ydb_operation_name}}"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Error Rate by Status Code",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "fieldConfig": {
+        "defaults": { "unit": "reqps", "color": { "mode": "palette-classic" } }
+      },
+      "options": { "legend": { "displayMode": "table", "placement": "right" } },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "Prometheus" },
+          "expr": "sum by (db_response_status_code, ydb_operation_name) (rate(ydb_client_operation_failed_total[$__rate_interval]))",
+          "legendFormat": "{{ydb_operation_name}} / {{db_response_status_code}}"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Operation Latency Percentiles",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "fieldConfig": {
+        "defaults": { "unit": "s", "color": { "mode": "palette-classic" } }
+      },
+      "options": { "legend": { "displayMode": "table", "placement": "right" } },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "Prometheus" },
+          "expr": "histogram_quantile(0.50, sum by (le, ydb_operation_name) (rate(db_client_operation_duration_seconds_bucket[$__rate_interval])))",
+          "legendFormat": "p50 · {{ydb_operation_name}}"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "Prometheus" },
+          "expr": "histogram_quantile(0.95, sum by (le, ydb_operation_name) (rate(db_client_operation_duration_seconds_bucket[$__rate_interval])))",
+          "legendFormat": "p95 · {{ydb_operation_name}}"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "Prometheus" },
+          "expr": "histogram_quantile(0.99, sum by (le, ydb_operation_name) (rate(db_client_operation_duration_seconds_bucket[$__rate_interval])))",
+          "legendFormat": "p99 · {{ydb_operation_name}}"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Session Pool — Idle / Used",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "fieldConfig": {
+        "defaults": { "unit": "short", "color": { "mode": "palette-classic" } }
+      },
+      "options": { "legend": { "displayMode": "table", "placement": "right" } },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "Prometheus" },
+          "expr": "ydb_query_session_count{ydb_query_session_state=\"idle\"}",
+          "legendFormat": "idle · {{ydb_query_session_pool_name}}"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "Prometheus" },
+          "expr": "ydb_query_session_count{ydb_query_session_state=\"used\"}",
+          "legendFormat": "used · {{ydb_query_session_pool_name}}"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "Session Create Time Percentiles",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "fieldConfig": {
+        "defaults": { "unit": "s", "color": { "mode": "palette-classic" } }
+      },
+      "options": { "legend": { "displayMode": "table", "placement": "right" } },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "Prometheus" },
+          "expr": "histogram_quantile(0.50, sum by (le, ydb_query_session_pool_name) (rate(ydb_query_session_create_time_seconds_bucket[$__rate_interval])))",
+          "legendFormat": "p50 · {{ydb_query_session_pool_name}}"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "Prometheus" },
+          "expr": "histogram_quantile(0.95, sum by (le, ydb_query_session_pool_name) (rate(ydb_query_session_create_time_seconds_bucket[$__rate_interval])))",
+          "legendFormat": "p95 · {{ydb_query_session_pool_name}}"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "Prometheus" },
+          "expr": "histogram_quantile(0.99, sum by (le, ydb_query_session_pool_name) (rate(ydb_query_session_create_time_seconds_bucket[$__rate_interval])))",
+          "legendFormat": "p99 · {{ydb_query_session_pool_name}}"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "title": "Total Operations",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 16 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": { "mode": "thresholds" },
+          "thresholds": { "steps": [{ "color": "green", "value": null }] }
+        }
+      },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "orientation": "auto", "textMode": "auto" },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "Prometheus" },
+          "expr": "sum(increase(db_client_operation_duration_seconds_count[$__range]))",
+          "legendFormat": "Total ops"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "title": "Total Errors",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 16 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 1 }
+            ]
+          }
+        }
+      },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "orientation": "auto", "textMode": "auto" },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "Prometheus" },
+          "expr": "sum(increase(ydb_client_operation_failed_total[$__range]))",
+          "legendFormat": "Total errors"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "title": "Traces — recent spans",
+      "type": "traces",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 20 },
+      "datasource": { "type": "jaeger", "uid": "Jaeger" },
+      "targets": [
+        {
+          "datasource": { "type": "jaeger", "uid": "Jaeger" },
+          "queryType": "search",
+          "service": "ydb-java-otel-examples",
+          "limit": 20
+        }
+      ]
+    }
+  ]
+}
