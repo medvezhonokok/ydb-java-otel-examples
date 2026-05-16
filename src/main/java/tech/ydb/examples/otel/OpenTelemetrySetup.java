@@ -13,16 +13,24 @@ import io.opentelemetry.sdk.trace.export.BatchSpanProcessor;
 
 import java.util.concurrent.TimeUnit;
 
+
 /**
- * Настройка OpenTelemetry SDK: создаёт TracerProvider и MeterProvider,
- * оба экспортируют данные в OTel Collector по OTLP gRPC.
+ * Утилита для настройки OpenTelemetry SDK с экспортом трейсов и метрик через OTLP/gRPC.
  *
+ * <p>Конфигурирует:
  * <ul>
- *   <li>Трейсы — через BatchSpanProcessor + OtlpGrpcSpanExporter</li>
- *   <li>Метрики — через PeriodicMetricReader (каждые 5с) + OtlpGrpcMetricExporter</li>
+ *   <li>{@link SdkTracerProvider} с {@link BatchSpanProcessor} → OTLP-эндпоинт</li>
+ *   <li>{@link SdkMeterProvider} с {@link PeriodicMetricReader} (интервал 5 с) → OTLP-эндпоинт</li>
  * </ul>
  */
 public class OpenTelemetrySetup {
+
+    /**
+     * Создаёт и возвращает настроенный {@link OpenTelemetry}.
+     *
+     * @param otlpEndpoint адрес OTLP-коллектора, например {@code http://localhost:4317}
+     * @param serviceName  имя сервиса, попадающее в атрибут {@code service.name} ресурса
+     */
     public static OpenTelemetry create(String otlpEndpoint, String serviceName) {
         var resource = Resource.getDefault().toBuilder()
                 .put(AttributeKey.stringKey("service.name"), serviceName)

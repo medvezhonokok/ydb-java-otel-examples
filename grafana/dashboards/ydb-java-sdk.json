@@ -18,7 +18,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "Prometheus" },
-          "expr": "sum by (ydb_operation_name) (rate(db_client_operation_duration_seconds_count[$__rate_interval]))",
+          "expr": "sum by (ydb_operation_name) (rate(ydb_client_operation_duration_seconds_count[$__rate_interval]))",
           "legendFormat": "{{ydb_operation_name}}"
         }
       ]
@@ -52,17 +52,17 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "Prometheus" },
-          "expr": "histogram_quantile(0.50, sum by (le, ydb_operation_name) (rate(db_client_operation_duration_seconds_bucket[$__rate_interval])))",
+          "expr": "histogram_quantile(0.50, sum by (le, ydb_operation_name) (rate(ydb_client_operation_duration_seconds_bucket[$__rate_interval])))",
           "legendFormat": "p50 · {{ydb_operation_name}}"
         },
         {
           "datasource": { "type": "prometheus", "uid": "Prometheus" },
-          "expr": "histogram_quantile(0.95, sum by (le, ydb_operation_name) (rate(db_client_operation_duration_seconds_bucket[$__rate_interval])))",
+          "expr": "histogram_quantile(0.95, sum by (le, ydb_operation_name) (rate(ydb_client_operation_duration_seconds_bucket[$__rate_interval])))",
           "legendFormat": "p95 · {{ydb_operation_name}}"
         },
         {
           "datasource": { "type": "prometheus", "uid": "Prometheus" },
-          "expr": "histogram_quantile(0.99, sum by (le, ydb_operation_name) (rate(db_client_operation_duration_seconds_bucket[$__rate_interval])))",
+          "expr": "histogram_quantile(0.99, sum by (le, ydb_operation_name) (rate(ydb_client_operation_duration_seconds_bucket[$__rate_interval])))",
           "legendFormat": "p99 · {{ydb_operation_name}}"
         }
       ]
@@ -132,7 +132,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "Prometheus" },
-          "expr": "sum(increase(db_client_operation_duration_seconds_count[$__range]))",
+          "expr": "sum(increase(ydb_client_operation_duration_seconds_count[$__range]))",
           "legendFormat": "Total ops"
         }
       ]
@@ -165,18 +165,13 @@
     },
     {
       "id": 8,
-      "title": "Traces — recent spans",
-      "type": "traces",
-      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 20 },
-      "datasource": { "type": "jaeger", "uid": "Jaeger" },
-      "targets": [
-        {
-          "datasource": { "type": "jaeger", "uid": "Jaeger" },
-          "queryType": "search",
-          "service": "ydb-java-otel-examples",
-          "limit": 20
-        }
-      ]
+      "title": "Traces — открыть в Jaeger UI",
+      "type": "text",
+      "gridPos": { "h": 3, "w": 24, "x": 0, "y": 20 },
+      "options": {
+        "mode": "markdown",
+        "content": "## [Открыть трейсы в Jaeger UI →](http://localhost:16686/search?service=ydb-java-otel-examples&limit=20)\n\nТрейсы `ydb.ExecuteQuery`, `ydb.Commit`, `ydb.Rollback` доступны в Jaeger."
+      }
     }
   ]
 }

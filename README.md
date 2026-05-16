@@ -1,7 +1,52 @@
 # YDB Java SDK — OpenTelemetry Examples
 
-Демонстрационное приложение для [ydb-java-sdk](https://github.com/ydb-platform/ydb-java-sdk),
-показывающее интеграцию с OpenTelemetry: метрики и трейсы из реальной нагрузки на YDB.
+Демонстрационное приложение, показывающее интеграцию [ydb-java-sdk](https://github.com/ydb-platform/ydb-java-sdk)
+с OpenTelemetry: метрики пула сессий и клиентских операций экспортируются в Prometheus/Grafana,
+трейсы — в Jaeger.
+
+## Архитектура
+
+```
+YDB Java SDK
+  ├── OpenTelemetryMeter   → метрики операций и пула сессий
+  └── OpenTelemetryTracer  → трейсы ExecuteQuery / Commit / Rollback / Retry
+
+        │ OTLP gRPC (:4317)
+        ▼
+  OTel Collector
+    ├── prometheus exporter (:9464) ← Prometheus ← Grafana
+    └── otlp exporter → Jaeger (:4317)     ← Grafana
+```
+
+## Метрики
+
+| Метрика | Тип | Описание |
+|---|---|---|
+| `ydb.client.operation.duration` | Histogram | Длительность клиентских операций |
+| `ydb.client.operation.failed` | Counter | Число завершившихся с ошибкой операций |
+| `ydb.client.retry.duration` | Histogram | Длительность retry-попыток |
+| `ydb.client.retry.attempts` | Histogram | Число попыток за один retry-вызов |
+| `ydb.query.session.count` | Gauge | Текущее число сессий в пуле (idle / used) |
+| `ydb.query.session.min` | Gauge | Минимальный размер пула |
+| `ydb.query.session.max` | Gauge | Максимальный размер пула |
+| `ydb.query.session.create_time` | Histogram | Время создания новой сессии |
+| `ydb.query.session.pending_requests` | Counter | Запросы, ожидающие свободной сессии |
+| `ydb.query.session.timeouts` | Counter | Тайм-ауты ожидания сессии |
+
+Атрибуты метрик: `database`, `endpoint`, `operation.name`, `ydb.query.session.state`, `ydb.query.session.pool.name`.
+
+## Трейсы
+
+| Span | Когда создаётся |
+|---|---|
+| `ydb.ExecuteQuery` | Любой SELECT / DML запрос |
+| `ydb.Commit` | Явный коммит транзакции |
+| `ydb.Rollback` | Откат транзакции |
+| `ydb.CreateSession` | Создание новой сессии в пуле |
+| `ydb.RunWithRetry` | Вызов через `SessionRetryContext` |
+| `ydb.Try` | Одна попытка внутри `RunWithRetry` (дочерний span) |
+
+Атрибуты ошибочных span-ов: `db.response.status_code`, `error.type`.
 
 ## Схема базы данных
 
@@ -14,50 +59,9 @@ Plan      (GroupId, CourseId, LecturerId)
 Marks     (StudentId, CourseId, Mark)
 ```
 
-## Метрики
-
-| Метрика | Тип | Описание | Теги |
-|---------|-----|----------|------|
-| `db.client.operation.duration` | Histogram | Длительность операций YDB (p50/p95/p99) | `ydb.operation.name`, `db.namespace`, `server.address`, `server.port` |
-| `ydb.client.operation.failed` | Counter | Количество ошибочных операций | `ydb.operation.name`, `db.response.status.code` |
-| `ydb.query.session.count` | Gauge | Текущее состояние пула сессий (idle/used) | `ydb.query.session.pool.name`, `ydb.query.session.state` |
-| `ydb.query.session.create_time` | Histogram | Время создания новой сессии в пуле | `ydb.query.session.pool.name` |
-
-## Панели дашборда
-
-| Панель | Что показывает |
-|--------|---------------|
-| Request Rate (RPS) | Частота операций по типу: ExecuteQuery, Commit, Rollback |
-| Error Rate by Status Code | Ошибки по типу операции и статус-коду YDB |
-| Operation Latency p50/p95/p99 | Перцентили задержки по типу операции |
-| Session Pool Idle / Used | Текущее состояние пула сессий |
-| Session Create Time | Время создания новой сессии в пуле |
-| Total Operations | Суммарное количество операций за выбранный период |
-| Total Errors | Суммарное количество ошибок (красный если > 0) |
-| Traces | Последние трейсы из Jaeger |
-
-## Скриншоты
-
-![Dashboard](images/dashboard-1.png)
-![Dashboard](images/dashboard-2.png)
-
-## Архитектура
-
-```
-App
-  └─ OTLP gRPC (:4317)
-        └─ OTel Collector              # принимает метрики и трейсы по OTLP
-              ├─ Prometheus exporter   # поднимает /metrics эндпоинт (:9464)
-              │    └─ ← Prometheus     # получает метрики каждые 15с
-              └─ OTLP → Jaeger         # пересылает трейсы в Jaeger (:4317)
-
-Grafana → Prometheus (метрики)         # строит графики метрик
-Grafana → Jaeger     (трейсы)          # визуализирует трейсы
-```
-
 ## Быстрый старт
 
-### 1. Установить локальный снепшот SDK
+### 1. Собрать локальный снепшот SDK
 
 ```bash
 git clone https://github.com/ydb-platform/ydb-java-sdk
@@ -72,19 +76,18 @@ cd ../ydb-java-otel-examples
 docker compose up -d
 ```
 
-Проверить что все сервисы запустились:
+Проверить статус (ожидается 5 сервисов):
+
 ```bash
 docker compose ps
 ```
 
-Ожидаемый вывод (5 сервисов):
 ```
-CONTAINER ID   IMAGE                                         STATUS
-xxxxxxxxxxxx   grafana/grafana:10.4.2                        Up
-xxxxxxxxxxxx   prom/prometheus:latest                        Up
-xxxxxxxxxxxx   otel/opentelemetry-collector-contrib:latest   Up
-xxxxxxxxxxxx   jaegertracing/all-in-one:latest               Up
-xxxxxxxxxxxx   ydbplatform/local-ydb:trunk                   Up (healthy)
+ydb-local        Up (healthy)
+otel-collector   Up
+prometheus       Up
+jaeger           Up
+grafana          Up
 ```
 
 ### 3. Собрать и запустить
@@ -95,18 +98,54 @@ java -jar target/ydb-java-otel-examples-1.0-SNAPSHOT.jar
 ```
 
 Аргументы (опциональны):
-```
+
+```bash
 java -jar target/ydb-java-otel-examples-1.0-SNAPSHOT.jar \
   "grpc://localhost:2136/?database=/local" \
   "http://localhost:4317"
 ```
 
-### 4. Открыть Grafana
+Приложение запускает бесконечный цикл запросов к YDB, генерируя метрики и трейсы.
 
-http://localhost:3000
+### 4. Grafana
 
-Дашборд **YDB Java SDK — OpenTelemetry** появится автоматически.
+http://localhost:3000 — дашборд **YDB Java SDK — OpenTelemetry** появится автоматически.
 
-### 5. Открыть Jaeger UI
+### 5. Jaeger UI
 
 http://localhost:16686
+
+## Скриншоты
+
+![Dashboard 1](images/dashboard-1.png)
+![Dashboard 2](images/dashboard-2.png)
+
+## Тесты
+
+Тесты запускаются против реального YDB в Docker (Testcontainers, через `YdbHelperRule`).
+
+```bash
+mvn test
+```
+
+| Тест-класс | Что проверяет | Тестов |
+|---|---|---|
+| `YdbUtilTest` | Корректность всех методов `YandexDatabaseUtils` | 30 |
+| `OpenTelemetryExampleMetricsTest` | Наличие и корректность всех 10 метрик | 36 |
+| `OpenTelemetryExampleTracingTest` | Наличие и корректность всех 6 видов span-ов | 43 |
+
+Метрики проверяются через `InMemoryMetricReader`, трейсы — через `InMemorySpanExporter` (без реального OTLP-коллектора).
+
+## Структура проекта
+
+```
+src/main/java/tech/ydb/examples/otel/
+  Main.java                 # точка входа, сборка transport / queryClient / retryCtx
+  OpenTelemetrySetup.java   # настройка SDK: BatchSpanProcessor + PeriodicMetricReader → OTLP
+  YandexDatabaseUtils.java  # операции с БД: SELECT, UPSERT, транзакции, retry, нагрузка
+
+src/test/java/tech/ydb/examples/otel/
+  YdbUtilTest.java                       # тесты утилит (100% публичных методов)
+  OpenTelemetryExampleMetricsTest.java   # тесты метрик
+  OpenTelemetryExampleTracingTest.java   # тесты трейсов
+```

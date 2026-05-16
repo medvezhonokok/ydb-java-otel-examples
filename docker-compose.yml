@@ -30,7 +30,6 @@ services:
       - "4318:4318"
       - "9464:9464"
       - "13133:13133"
-      - "55679:55679"
 
   prometheus:
     image: prom/prometheus:latest
